@@ -114,7 +114,7 @@ public class StreamingService {
                         repeatingLog = null;
                     }
 
-                    // determine if a log lines repeats
+                    // determine if a log lines repeatsgit
                     if (Math.random() < selectionModel.getRepeatingLoglinesPercent()) {
                         repeatingLog = logs[i];
                     }
