@@ -63,9 +63,8 @@ public class BatchTrackerService {
                         new LogMessage(job.getStatus(), job.getLogCount(),
                                 System.currentTimeMillis(), job.getBatchObjectURL()));
 
-                // Check if the job has been marked not active to remove it
-                // from the active jobs list
-                if (job.getStatus() != JobStatus.ACTIVE) {
+                // if job isn't active or finalizing, remove from active jobs
+                if (job.getStatus() != JobStatus.ACTIVE && job.getStatus() != JobStatus.FINALIZING) {
                     setBatchJobToCompleted(job);
                 }
             }

@@ -8,25 +8,24 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.scheduling.annotation.Async;
 
 import org.json.simple.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import com.ad1.loggenerator.exception.AWSServiceNotAvailableException;
 import com.ad1.loggenerator.exception.FilePathNotFoundException;
 import com.ad1.loggenerator.model.JobStatus;
 import com.ad1.loggenerator.model.SelectionModel;
 import com.ad1.loggenerator.model.StreamTracker;
 
 import lombok.Data;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-
 import reactor.core.publisher.Mono;
-
 
 /**
  * Contains logic for processing user requests and generating outputs specific
@@ -37,9 +36,11 @@ import reactor.core.publisher.Mono;
 public class StreamingService {
 
     private LogService logService;
+    private AWSStreamService awsStreamService;
 
-    public StreamingService(@Autowired LogService logService) {
+    public StreamingService(@Autowired LogService logService, @Autowired AWSStreamService awsStreamService) {
         this.logService = logService;
+        this.awsStreamService = awsStreamService;
     }
 
     /**
@@ -89,20 +90,35 @@ public class StreamingService {
         logService.preProcessCustomLogs(selectionModel.getCustomLogs(), selectionModel);
         Set<String> masterFieldList = logService.getMasterFieldsList(selectionModel.getCustomLogs());
 
-        // temp file to save the log lines
-        File tempLogFile = new File("temp.log");
-        if (tempLogFile.exists()) {
-            tempLogFile.delete();
-        }
-        int numLogLines = 0;
+        // should logs be saved
+        boolean saveLogs = selectionModel.getStreamSettings().isSaveLogs();
+
+        // File and FileWriter for savings log lines
+        File tempLogFile = null;
+        FileWriter fileWriter = null;
+
         try {
-            // Check if the file exists, create a new one if it doesn't exist
-            if (!tempLogFile.exists()) {
-                tempLogFile.createNewFile();
+            boolean firstLogSaved = false;
+
+            if (saveLogs) {
+                // FileWriter for savings log lines
+                tempLogFile = new File(streamJobTracker.getJobId() + ".json");
+                fileWriter = new FileWriter(tempLogFile, true);
+
+                // delete file if it already exists
+                if (tempLogFile.exists()) {
+                    tempLogFile.delete();
+                }
+
+                // Check if the file exists, create a new one if it doesn't exist
+                if (!tempLogFile.exists()) {
+                    tempLogFile.createNewFile();
+                }
+
+                // write a [ to begin the log file
+                fileWriter.write("[");
             }
-            FileWriter fileWriter = new FileWriter(tempLogFile, true);
-            // write a [ to begin the log file
-            fileWriter.write("[");
+
             while (streamJobTracker.getStatus() == JobStatus.ACTIVE) {
                 // generate batchSize number of logs
                 for (int i = 0; i < batchSize; i++) {
@@ -118,13 +134,17 @@ public class StreamingService {
                     if (Math.random() < selectionModel.getRepeatingLoglinesPercent()) {
                         repeatingLog = logs[i];
                     }
-                    if (numLogLines > 0) { // add delimiter if not first log line written
-                        fileWriter.write(",\n");
+
+                    // writing logs to temp file
+                    if (saveLogs) {
+                        if (firstLogSaved) { // add delimiter if not first log line written
+                            fileWriter.write(",\n");
+                        }
+                        // Write the log lines to the temp log file
+                        fileWriter.write(logs[i].toString());
+
+                        firstLogSaved = true;
                     }
-                    //Write the log lines to the temp log file
-                    fileWriter.write(logs[i].toString());
-//                    fileWriter.write(logs[i].toString() + ", \n");
-                    numLogLines++;
                 }
                 // nanoseconds until next request time
                 nsToNextRequest = nextSendNanoTime - System.nanoTime();
@@ -166,16 +186,51 @@ public class StreamingService {
                 // increment log count by batch size
                 streamJobTracker.setLogCount(streamJobTracker.getLogCount() + batchSize);
             }
-            // write a ] to end the log file
-            fileWriter.write("]");
-            fileWriter.close();
+
+            // upload logs to s3 is saveLogs
+            if (saveLogs) {
+                // write a ] to end the log file
+                fileWriter.write("]");
+                fileWriter.close();
+
+                // upload logs to s3
+                try {
+                    awsStreamService.saveLogsToAWSS3(streamJobTracker);
+                } catch (AWSServiceNotAvailableException e) {
+                    // Mark the job as failed if exception occurred
+                    streamJobTracker.setStatus(JobStatus.FAILED);
+
+                    throw new AWSServiceNotAvailableException(e.getMessage());
+                } catch (RuntimeException e) {
+                    // Mark the job as failed if exception occurred
+                    streamJobTracker.setStatus(JobStatus.FAILED);
+
+                    throw new RuntimeException(e.getMessage());
+                } finally {
+                    // delete temp file if exists
+                    if (tempLogFile.exists()) {
+                        tempLogFile.delete();
+                    }
+                }
+            }
         } catch (IOException e) {
+            // Mark the job as failed if exception occurred
+            streamJobTracker.setStatus(JobStatus.FAILED);
+
+            // delete temp file if exists
+            if (tempLogFile != null && tempLogFile.exists()) {
+                tempLogFile.delete();
+            }
             throw new FilePathNotFoundException(e.getMessage());
         }
 
         if (!errorMessage[0].isEmpty()) {
             return errorMessage[0];
         }
+
+        // Mark the job as completed
+        streamJobTracker.setStatus(JobStatus.COMPLETED);
+
         return "Successfully streamed to address.";
     }
 
@@ -231,6 +286,9 @@ public class StreamingService {
             streamJobTracker.setStatus(JobStatus.FAILED);
             throw new FilePathNotFoundException(e.getMessage());
         }
+
+        // Mark the job as completed
+        streamJobTracker.setStatus(JobStatus.COMPLETED);
     }
 
     /**

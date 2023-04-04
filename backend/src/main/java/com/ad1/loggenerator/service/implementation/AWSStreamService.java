@@ -1,5 +1,18 @@
 package com.ad1.loggenerator.service.implementation;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Set;
+
+import org.json.simple.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
 import com.ad1.loggenerator.exception.AWSServiceNotAvailableException;
 import com.ad1.loggenerator.model.JobStatus;
 import com.ad1.loggenerator.model.SelectionModel;
@@ -7,16 +20,15 @@ import com.ad1.loggenerator.model.StreamTracker;
 import com.ad1.loggenerator.service.AWSLogService;
 import com.amazonaws.SdkClientException;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.*;
-import lombok.*;
-import org.json.simple.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
+import com.amazonaws.services.s3.model.CannedAccessControlList;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.amazonaws.services.s3.model.S3Object;
 
-import java.io.*;
-import java.net.URL;
-import java.util.Set;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
@@ -31,7 +43,8 @@ public class AWSStreamService {
     private AWSLogService awsLogService;
 
     @Async("asyncTaskExecutor")
-    public void streamToS3Buffer(SelectionModel selectionModel, StreamTracker streamJobTracker) throws IOException {
+    public void streamToS3Buffer(SelectionModel selectionModel, StreamTracker streamJobTracker)
+            throws IOException, AWSServiceNotAvailableException {
         // specify the s3 bucket and key for the log file
         String bucketName = "stream-s3-log-generator";
         String key = "stream/" + awsLogService.createCurrentTimeDate() + ".json";
@@ -41,7 +54,7 @@ public class AWSStreamService {
         // create s3 client instance
         AmazonS3 s3Client = awsLogService.createS3Client();
         // reset the start time of the stream
-        streamJobTracker.setLastPing(System.currentTimeMillis()/1000);
+        streamJobTracker.setLastPing(System.currentTimeMillis() / 1000);
         // specify buffer size for uploading log lines to S3
         int bufferSize = 20 * 1024 * 1024; // 20MB buffer
         // create a temporary buffer to store log lines
@@ -73,7 +86,8 @@ public class AWSStreamService {
 
                 // upload buffer to S3 when it is full
                 if (buffer.size() >= bufferSize) {
-                    try (InputStream inputStream = new ByteArrayInputStream(("[" + buffer.toString() + "]").getBytes())) {
+                    try (InputStream inputStream = new ByteArrayInputStream(
+                            ("[" + buffer.toString() + "]").getBytes())) {
                         ObjectMetadata metadata = new ObjectMetadata();
                         metadata.setContentLength(buffer.size() + 2);
                         s3Client.putObject(bucketName, key, inputStream, metadata);
@@ -92,24 +106,34 @@ public class AWSStreamService {
                 }
                 buffer.reset();
             }
+
+            // Make the s3 object public
+            s3Client.setObjectAcl(bucketName, key, CannedAccessControlList.PublicRead);
+            // Get the url of the s3 object and the s3 object
+            URL objectURL = s3Client.getUrl(bucketName, key);
+            S3Object s3Object = s3Client.getObject(bucketName, key);
+            // Set the url of the s3 object and count of the log lines saved to the bucket
+            // object to StreamJobTracker
+            streamJobTracker.setStreamObjectURL(objectURL);
+            streamJobTracker.setLogCount(awsLogService.getLogCount(s3Client, s3Object, bucketName, key));
+
+            // Mark the job as completed
+            streamJobTracker.setStatus(JobStatus.COMPLETED);
         } catch (SdkClientException e) {
             // Mark the job as failed if exception occurred
             streamJobTracker.setStatus(JobStatus.FAILED);
             throw new AWSServiceNotAvailableException(e.getMessage());
+        } catch (IOException e) {
+            // Mark the job as failed if exception occurred
+            streamJobTracker.setStatus(JobStatus.FAILED);
+            throw new IOException(e.getMessage());
         }
- 
-        //Make the s3 object public
-        s3Client.setObjectAcl(bucketName, key, CannedAccessControlList.PublicRead);
-        // Get the url of the s3 object and the s3 object
-        URL objectURL = s3Client.getUrl(bucketName, key);
-        S3Object s3Object = s3Client.getObject(bucketName, key);
-        // Set the url of the s3 object and count of the log lines saved to the bucket object to StreamJobTracker
-        streamJobTracker.setStreamObjectURL(objectURL);
-        streamJobTracker.setLogCount(awsLogService.getLogCount(s3Client, s3Object, bucketName, key));
+
     }
 
     @Async("asyncTaskExecutor")
-    public void streamToS3(SelectionModel selectionModel, StreamTracker streamJobTracker) throws IOException {
+    public void streamToS3(SelectionModel selectionModel, StreamTracker streamJobTracker)
+            throws IOException, AWSServiceNotAvailableException {
         // specify the s3 bucket and key for the log file
         String bucketName = "stream-s3-log-generator";
         String key = "stream/" + awsLogService.createCurrentTimeDate() + ".json";
@@ -122,7 +146,7 @@ public class AWSStreamService {
         AmazonS3 s3Client = awsLogService.createS3Client();
 
         // reset the start time of the stream
-        streamJobTracker.setLastPing(System.currentTimeMillis()/1000);
+        streamJobTracker.setLastPing(System.currentTimeMillis() / 1000);
 
         // create StringBuilder object to append log lines
         StringBuilder stringBuilder = new StringBuilder();
@@ -159,52 +183,62 @@ public class AWSStreamService {
             ByteArrayInputStream inputStream = new ByteArrayInputStream(contentAsBytes);
             PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, key, inputStream, metadata);
             s3Client.putObject(putObjectRequest);
-            //Make the s3 object public
+            // Make the s3 object public
             s3Client.setObjectAcl(bucketName, key, CannedAccessControlList.PublicRead);
             // Get the url of the s3 object and the s3 object itself
             URL objectURL = s3Client.getUrl(bucketName, key);
             S3Object s3Object = s3Client.getObject(bucketName, key);
-            // Count the log lines saved to the bucket object, set url and the log count to the stream job tracker
+            // Count the log lines saved to the bucket object, set url and the log count to
+            // the stream job tracker
             streamJobTracker.setLogCount(awsLogService.getLogCount(s3Client, s3Object, bucketName, key));
             streamJobTracker.setStreamObjectURL(objectURL);
-            streamJobTracker.setStatus(JobStatus.COMPLETED);
 
+            // Mark the job as completed
+            streamJobTracker.setStatus(JobStatus.COMPLETED);
         } catch (SdkClientException e) {
             // Mark the job as failed if exception occurred
             streamJobTracker.setStatus(JobStatus.FAILED);
             throw new AWSServiceNotAvailableException(e.getMessage());
+        } catch (IOException e) {
+            // Mark the job as failed if exception occurred
+            streamJobTracker.setStatus(JobStatus.FAILED);
+            throw new IOException(e.getMessage());
         }
     }
 
-    public void saveLogsToAWSS3(StreamTracker streamJobTracker) throws IOException {
+    public void saveLogsToAWSS3(StreamTracker streamJobTracker)
+            throws IOException, AWSServiceNotAvailableException, RuntimeException {
         // specify the s3 bucket and key for the log file
         String bucketName = "stream-s3-log-generator";
         String key = "stream/" + awsLogService.createCurrentTimeDate() + ".json";
         // create s3 client instance
         AmazonS3 s3Client = awsLogService.createS3Client();
         // specify the local file path to upload
-        File tempLogFile = new File("temp.log");
+        File tempLogFile = new File(streamJobTracker.getJobId() + ".json");
         if (!tempLogFile.exists()) {
             throw new RuntimeException("temp log file do not exist");
         }
         try {
             PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, key, tempLogFile);
             s3Client.putObject(putObjectRequest);
+
+            // Make the s3 object public
+            s3Client.setObjectAcl(bucketName, key, CannedAccessControlList.PublicRead);
+            // Get the url of the s3 object and the s3 object itself
+            URL objectURL = s3Client.getUrl(bucketName, key);
+            S3Object s3Object = s3Client.getObject(bucketName, key);
+            // Count the log lines saved to the bucket object, set url and the log count to
+            // the stream job tracker
+            streamJobTracker.setLogCount(awsLogService.getLogCount(s3Client, s3Object, bucketName, key));
+            streamJobTracker.setStreamObjectURL(objectURL);
+
+            // Mark the job as completed
+            streamJobTracker.setStatus(JobStatus.COMPLETED);
         } catch (SdkClientException e) {
             // Mark the job as failed if exception occurred
             streamJobTracker.setStatus(JobStatus.FAILED);
             throw new AWSServiceNotAvailableException(e.getMessage());
         }
-        //Make the s3 object public
-        s3Client.setObjectAcl(bucketName, key, CannedAccessControlList.PublicRead);
-        // Get the url of the s3 object and the s3 object itself
-        URL objectURL = s3Client.getUrl(bucketName, key);
-        S3Object s3Object = s3Client.getObject(bucketName, key);
-        // Count the log lines saved to the bucket object, set url and the log count to the stream job tracker
-        streamJobTracker.setLogCount(awsLogService.getLogCount(s3Client, s3Object, bucketName, key));
-        streamJobTracker.setStreamObjectURL(objectURL);
-        streamJobTracker.setStatus(JobStatus.COMPLETED);
     }
 
 }
-

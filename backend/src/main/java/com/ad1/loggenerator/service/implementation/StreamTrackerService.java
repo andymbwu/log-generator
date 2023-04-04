@@ -72,7 +72,8 @@ public class StreamTrackerService {
                  * }
                  */
 
-                if (job.getStatus() != JobStatus.ACTIVE) {
+                // if job isn't active or finalizing, remove from active jobs
+                if (job.getStatus() != JobStatus.ACTIVE && job.getStatus() != JobStatus.FINALIZING) {
                     setStreamJobToCompleted(job);
                 }
 
@@ -123,7 +124,7 @@ public class StreamTrackerService {
     }
 
     /**
-     * Stop a stream job right away
+     * Stops a stream job. Sets status to FINALIZING
      * 
      * @param jobId
      * @return
@@ -134,7 +135,8 @@ public class StreamTrackerService {
             return false;
         }
 
-        streamTracker.setStatus(JobStatus.COMPLETED);
+        // set job status to FINALIZING
+        streamTracker.setStatus(JobStatus.FINALIZING);
         return true;
     }
 
