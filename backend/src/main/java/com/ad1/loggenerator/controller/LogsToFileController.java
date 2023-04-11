@@ -37,7 +37,13 @@ public class LogsToFileController {
     private final StreamingService streamingService;
     private final StreamTrackerService streamServiceTracker;
 
-    // general request for generating batch files or streaming
+    /**
+     * Method to generate log files in batch mode and save locally
+     * 
+     * @param selectionModel
+     * @return
+     * @throws InterruptedException
+     */
     @PostMapping("/batch")
     public ResponseEntity<String> generateBatchRequest(
             @Valid @RequestBody SelectionModel selectionModel) throws InterruptedException {
@@ -65,6 +71,13 @@ public class LogsToFileController {
         }
     }
 
+    /**
+     * Method to stream logs to an address and optionally also save locally
+     * 
+     * @param selectionModel
+     * @return
+     * @throws InterruptedException
+     */
     @PostMapping("/stream")
     public ResponseEntity<String> generateStreamRequest(
             @Valid @RequestBody SelectionModel selectionModel) throws InterruptedException {

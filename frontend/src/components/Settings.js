@@ -184,11 +184,18 @@ function Settings({ jobID, setJobID, setBatchMode, setBatchSize }) {
         console.log(JSON.stringify(body, null, 2));
 
         // request address
+        // request address
         let address = process.env.REACT_APP_API_URL + 'generate/';
         if (values.mode === 'Batch') {
-          address = address + 'batch';
+          address =
+            address +
+            'batch' +
+            (process.env.REACT_APP_SAVE_LOGS === 'S3' ? '/s3' : '');
         } else {
-          address = address + 'stream';
+          address =
+            address +
+            'stream' +
+            (process.env.REACT_APP_SAVE_LOGS === 'S3' ? '/s3/toAddress' : '');
         }
 
         // request options

@@ -2,8 +2,6 @@ package com.ad1.loggenerator.service.implementation;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Set;
 import java.util.UUID;
 
@@ -48,7 +46,7 @@ public class BatchService {
             BatchSettings batchSettings = selectionModel.getBatchSettings();
 
             // specify filepath location for batch file
-            String filename = "C:\\log-generator\\batch\\" + selectionModel.getJobId() + ".json";
+            String filename = "logs\\batch\\" + selectionModel.getJobId() + ".json";
             FileWriter fileWriter = new FileWriter(filename);
 
             // remove fields that should not be included in custom logs
@@ -59,30 +57,30 @@ public class BatchService {
             fileWriter.write("[");
 
             // add log lines to batch file
-            for (int i = 0; i < batchSettings.getNumberOfLogs() 
-                && batchJobTracker.getStatus() == JobStatus.ACTIVE; i++) { // repeat for specified batch size
+            for (int i = 0; i < batchSettings.getNumberOfLogs()
+                    && batchJobTracker.getStatus() == JobStatus.ACTIVE; i++) { // repeat for specified batch size
 
-                    // add a delimiter if it's not the first log line written
-                    if (i > 0) {
-                        fileWriter.write(",\n");
-                    }
+                // add a delimiter if it's not the first log line written
+                if (i > 0) {
+                    fileWriter.write(",\n");
+                }
 
-                    JSONObject logLine = logService.generateLogLine(selectionModel, masterFieldList);
-                    fileWriter.write(logLine.toString());
-                    batchJobTracker.setLogCount(batchJobTracker.getLogCount() + 1);
+                JSONObject logLine = logService.generateLogLine(selectionModel, masterFieldList);
+                fileWriter.write(logLine.toString());
+                batchJobTracker.setLogCount(batchJobTracker.getLogCount() + 1);
 
-                    // determine if a log lines repeats
-                    // check i + 1 because at this point i is one behind actual logs written
-                    if (Math.random() < selectionModel.getRepeatingLoglinesPercent()
+                // determine if a log lines repeats
+                // check i + 1 because at this point i is one behind actual logs written
+                if (Math.random() < selectionModel.getRepeatingLoglinesPercent()
                         && i + 1 < batchSettings.getNumberOfLogs() && batchJobTracker.getStatus() == JobStatus.ACTIVE) {
-                        
-                        // add a delimiter
-                        fileWriter.write(",\n");
-                        // write the log line
-                        fileWriter.write(logLine.toString());
-                        i++;
-                        batchJobTracker.setLogCount(batchJobTracker.getLogCount() + 1);
-                    }
+
+                    // add a delimiter
+                    fileWriter.write(",\n");
+                    // write the log line
+                    fileWriter.write(logLine.toString());
+                    i++;
+                    batchJobTracker.setLogCount(batchJobTracker.getLogCount() + 1);
+                }
 
             }
 

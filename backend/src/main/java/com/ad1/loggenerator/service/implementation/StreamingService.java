@@ -3,8 +3,6 @@ package com.ad1.loggenerator.service.implementation;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -19,7 +17,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import com.ad1.loggenerator.exception.AWSServiceNotAvailableException;
 import com.ad1.loggenerator.exception.FilePathNotFoundException;
 import com.ad1.loggenerator.model.JobStatus;
 import com.ad1.loggenerator.model.SelectionModel;
@@ -37,11 +34,9 @@ import reactor.core.publisher.Mono;
 public class StreamingService {
 
     private LogService logService;
-    private AWSStreamService awsStreamService;
 
-    public StreamingService(@Autowired LogService logService, @Autowired AWSStreamService awsStreamService) {
+    public StreamingService(@Autowired LogService logService) {
         this.logService = logService;
-        this.awsStreamService = awsStreamService;
     }
 
     /**
@@ -103,7 +98,7 @@ public class StreamingService {
 
             if (saveLogs) {
                 // FileWriter for savings log lines
-                tempLogFile = new File(streamJobTracker.getJobId() + ".json");
+                tempLogFile = new File("logs\\stream\\" + streamJobTracker.getJobId() + ".json");
                 fileWriter = new FileWriter(tempLogFile, true);
 
                 // delete file if it already exists
@@ -186,40 +181,16 @@ public class StreamingService {
                 streamJobTracker.setLogCount(streamJobTracker.getLogCount() + batchSize);
             }
 
-            // upload logs to s3 is saveLogs
             if (saveLogs) {
                 // write a ] to end the log file
                 fileWriter.write("]");
                 fileWriter.close();
-
-                // upload logs to s3
-                try {
-                    awsStreamService.saveLogsToAWSS3(streamJobTracker);
-                } catch (AWSServiceNotAvailableException e) {
-                    // Mark the job as failed if exception occurred
-                    streamJobTracker.setStatus(JobStatus.FAILED);
-
-                    throw new AWSServiceNotAvailableException(e.getMessage());
-                } catch (RuntimeException e) {
-                    // Mark the job as failed if exception occurred
-                    streamJobTracker.setStatus(JobStatus.FAILED);
-
-                    throw new RuntimeException(e.getMessage());
-                } finally {
-                    // delete temp file if exists
-                    if (tempLogFile.exists()) {
-                        tempLogFile.delete();
-                    }
-                }
             }
+
         } catch (IOException e) {
             // Mark the job as failed if exception occurred
             streamJobTracker.setStatus(JobStatus.FAILED);
 
-            // delete temp file if exists
-            if (tempLogFile != null && tempLogFile.exists()) {
-                tempLogFile.delete();
-            }
             throw new FilePathNotFoundException(e.getMessage());
         }
 
@@ -239,7 +210,7 @@ public class StreamingService {
         streamJobTracker.setLastPing(System.currentTimeMillis() / 1000);
 
         // specify filepath location for stream file
-        String filename = "C:\\log-generator\\stream\\" + streamJobTracker.getJobId() + ".json";
+        String filename = "logs\\stream\\" + selectionModel.getJobId() + ".json";
 
         // remove fields that should not be included in custom logs
         logService.preProcessCustomLogs(selectionModel.getCustomLogs(), selectionModel);
@@ -262,7 +233,7 @@ public class StreamingService {
                 streamJobTracker.setLogCount(streamJobTracker.getLogCount() + 1);
 
                 // determine if a log lines repeats
-                if (Math.random() < selectionModel.getRepeatingLoglinesPercent() 
+                if (Math.random() < selectionModel.getRepeatingLoglinesPercent()
                         && streamJobTracker.getStatus() == JobStatus.ACTIVE) {
                     fileWriter.write(",\n");
                     fileWriter.write(logLine.toString());

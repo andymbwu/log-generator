@@ -1,13 +1,20 @@
 package com.ad1.loggenerator.service;
 
-import com.ad1.loggenerator.model.*;
-import com.ad1.loggenerator.service.implementation.AWSStreamService;
-import com.ad1.loggenerator.service.implementation.LogService;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.CannedAccessControlList;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.S3Object;
-import mockit.Mocked;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
 import org.json.simple.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
@@ -16,17 +23,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URL;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
+import com.ad1.loggenerator.model.CustomLog;
+import com.ad1.loggenerator.model.SelectionModel;
+import com.ad1.loggenerator.model.StreamTracker;
+import com.ad1.loggenerator.service.implementation.AWSStreamService;
+import com.ad1.loggenerator.service.implementation.LogService;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.CannedAccessControlList;
+import com.amazonaws.services.s3.model.S3Object;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.times;
+import mockit.Mocked;
 
 @ExtendWith(MockitoExtension.class)
 public class AWSStreamServiceTest {
@@ -80,7 +86,8 @@ public class AWSStreamServiceTest {
         when(logService.getMasterFieldsList(selectionModel.getCustomLogs())).thenReturn(masterFieldList);
         when(logService.generateLogLine(selectionModel, masterFieldList)).thenReturn(logLine);
         when(s3Client.getObject(anyString(), anyString())).thenReturn(s3Object);
-        when(awsLogService.getLogCount(any(AmazonS3.class), any(S3Object.class), anyString(), anyString())).thenReturn(10);
+        when(awsLogService.getLogCount(any(AmazonS3.class), any(S3Object.class), anyString(), anyString()))
+                .thenReturn(10);
         when(awsLogService.createS3Client()).thenReturn(s3Client);
 
         // Act (when) - call the method being tested
@@ -102,12 +109,13 @@ public class AWSStreamServiceTest {
         verify(logService, times(1)).getMasterFieldsList(selectionModel.getCustomLogs());
     }
 
-//    @DisplayName("Verify log lines are generated at least once")
-//    @Test
-//    public void testStreamToS3LogLineGeneration() {
-//        // then - verify that the expected interactions occurred
-//        verify(logService, atLeastOnce()).generateLogLine(selectionModel, masterFieldList);
-//    }
+    // @DisplayName("Verify log lines are generated at least once")
+    // @Test
+    // public void testStreamToS3LogLineGeneration() {
+    // // then - verify that the expected interactions occurred
+    // verify(logService, atLeastOnce()).generateLogLine(selectionModel,
+    // masterFieldList);
+    // }
 
     @DisplayName("Verify currentTimeDate is created once to append to file path")
     @Test
@@ -123,13 +131,15 @@ public class AWSStreamServiceTest {
         verify(awsLogService, times(1)).createS3Client();
     }
 
-//    @DisplayName("Verify that the log lines are put in the s3 object at least once, " +
-//            "given  a string bucketname, a string key, an inputstream and metadata")
-//    @Test
-//    public void testPutObject() {
-//        // then - verify that the expected interactions occurred
-//        verify(s3Client, atLeastOnce()).putObject(anyString(), anyString(), any(InputStream.class), any(ObjectMetadata.class));
-//    }
+    // @DisplayName("Verify that the log lines are put in the s3 object at least
+    // once, " +
+    // "given a string bucketname, a string key, an inputstream and metadata")
+    // @Test
+    // public void testPutObject() {
+    // // then - verify that the expected interactions occurred
+    // verify(s3Client, atLeastOnce()).putObject(anyString(), anyString(),
+    // any(InputStream.class), any(ObjectMetadata.class));
+    // }
 
     @DisplayName("Verify the Object ACL is set to public read while streaming log lines to S3 buffer")
     @Test
@@ -161,12 +171,12 @@ public class AWSStreamServiceTest {
 
     }
 
-//    @DisplayName("Test to set the stream object url to stream job tracker once")
-//    @Test
-//    public void testToSetStreamObjectUrlToStreamJobTracker() {
-//        // then - verify that the expected interactions occurred
-//        verify(streamJobTracker, times(1)).setStreamObjectURL(any(URL.class));
-//    }
+    // @DisplayName("Test to set the stream object url to stream job tracker once")
+    // @Test
+    // public void testToSetStreamObjectUrlToStreamJobTracker() {
+    // // then - verify that the expected interactions occurred
+    // verify(streamJobTracker, times(1)).setStreamObjectURL(any(URL.class));
+    // }
 
     @DisplayName("Test to set the number of log counts to stream job tracker")
     @Test
@@ -175,13 +185,3 @@ public class AWSStreamServiceTest {
         verify(streamJobTracker, times(1)).setLogCount(anyInt());
     }
 }
-
-
-
-
-
-
-
-
-
-

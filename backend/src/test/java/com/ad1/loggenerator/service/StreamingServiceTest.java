@@ -1,12 +1,37 @@
 package com.ad1.loggenerator.service;
 
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.AdditionalMatchers.or;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
-import static org.hamcrest.CoreMatchers.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 import org.json.simple.JSONObject;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
@@ -30,26 +55,11 @@ import com.ad1.loggenerator.service.implementation.AWSStreamService;
 import com.ad1.loggenerator.service.implementation.LogService;
 import com.ad1.loggenerator.service.implementation.StreamingService;
 
-import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.AdditionalMatchers.*;
-
-import static org.junit.jupiter.api.Assertions.*;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
 
 public class StreamingServiceTest {
-    
+
     private StreamingService streamingService;
     private LogService logService;
     private AWSStreamService awsStreamService;
@@ -65,34 +75,34 @@ public class StreamingServiceTest {
     private List<CustomLog> customLogs;
 
     private SelectionModel selectionModel;
-    
+
     private StreamTracker streamTracker0;
     private StreamTracker streamTracker1;
     private StreamTracker streamTracker2;
 
-    private final String streamModeFolder = "C:\\log-generator\\stream\\";
+    private final String streamModeFolder = "logs\\stream\\";
     private final String jsonRegexString = "^\\[((\\{(\".*\":.*)*\\})(,\\s)?)*\\]$";
     private final String uuidRegex = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
 
     @BeforeAll
-    public static void setUpBeforeAll() throws IOException{
+    public static void setUpBeforeAll() throws IOException {
         mockBackEnd = new MockWebServer();
         mockBackEnd.start();
     }
 
     @BeforeEach
     public void setUp() {
-        
+
         logService = new LogService();
         awsStreamService = mock(AWSStreamService.class);
-        streamingService = new StreamingService(logService, awsStreamService);
+        streamingService = new StreamingService(logService);
 
         // Set up for all SelectioNModels
         jobId = "1";
         repeatingLoglinesPercentage = 0;
         malwareSettings = new MalwareSettings(true, true, true);
         mode = "Stream";
-        streamSettings = new StreamSettings("http://localhost:"+mockBackEnd.getPort(), 10, true);
+        streamSettings = new StreamSettings("http://localhost:" + mockBackEnd.getPort(), 10, true);
         batchSettings = new BatchSettings(0);
         customLogs = new ArrayList<CustomLog>();
 
@@ -104,25 +114,23 @@ public class StreamingServiceTest {
         FileSha256 fileSha256 = new FileSha256(true, new ArrayList<String>());
         Disposition disposition = new Disposition(false, new ArrayList<Integer>());
         fieldSettings = new FieldSettings(
-            timeStamp,
-            processingTime,
-            currentUserId,
-            businessGuid,
-            pathToFile,
-            fileSha256,
-            disposition
-        );
+                timeStamp,
+                processingTime,
+                currentUserId,
+                businessGuid,
+                pathToFile,
+                fileSha256,
+                disposition);
 
         selectionModel = new SelectionModel(
-            jobId,
-            repeatingLoglinesPercentage,
-            fieldSettings,
-            malwareSettings,
-            mode,
-            streamSettings,
-            batchSettings,
-            customLogs
-        );
+                jobId,
+                repeatingLoglinesPercentage,
+                fieldSettings,
+                malwareSettings,
+                mode,
+                streamSettings,
+                batchSettings,
+                customLogs);
 
         // Set up for stream tracker of size 0, 1, 2
         streamTracker0 = createStreamTracker(0);
@@ -189,14 +197,12 @@ public class StreamingServiceTest {
         streamTracker.setJobId(">");
 
         assertThrows(
-            FilePathNotFoundException.class,
-            () -> streamingService.streamMode(selectionModel, streamTracker)
-        );
+                FilePathNotFoundException.class,
+                () -> streamingService.streamMode(selectionModel, streamTracker));
         assertEquals(
-            JobStatus.FAILED,
-            streamTracker.getStatus(),
-            "Status should be FAILED if failure to write to file"
-        );
+                JobStatus.FAILED,
+                streamTracker.getStatus(),
+                "Status should be FAILED if failure to write to file");
     }
 
     @Test
@@ -387,19 +393,18 @@ public class StreamingServiceTest {
         logService = mock(LogService.class);
 
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
-        streamingService = new StreamingService(logService, null);
+        streamingService = new StreamingService(logService);
         streamingService.streamToFile(selectionModel, streamTracker0);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
+                .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(any(List.class));
+                .getMasterFieldsList(any(List.class));
         verify(logService, times(0))
-            .generateLogLine(any(SelectionModel.class), any(Set.class));
+                .generateLogLine(any(SelectionModel.class), any(Set.class));
     }
 
     @Test
@@ -407,19 +412,18 @@ public class StreamingServiceTest {
         logService = mock(LogService.class);
 
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
-        streamingService = new StreamingService(logService, null);
+        streamingService = new StreamingService(logService);
         streamingService.streamToFile(selectionModel, streamTracker1);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
+                .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(any(List.class));
+                .getMasterFieldsList(any(List.class));
         verify(logService, times(1))
-            .generateLogLine(any(SelectionModel.class), any(Set.class));
+                .generateLogLine(any(SelectionModel.class), any(Set.class));
     }
 
     @Test
@@ -427,19 +431,18 @@ public class StreamingServiceTest {
         logService = mock(LogService.class);
 
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
-        streamingService = new StreamingService(logService, null);
+        streamingService = new StreamingService(logService);
         streamingService.streamToFile(selectionModel, streamTracker2);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
+                .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(any(List.class));
+                .getMasterFieldsList(any(List.class));
         verify(logService, times(2))
-            .generateLogLine(any(SelectionModel.class), any(Set.class));
+                .generateLogLine(any(SelectionModel.class), any(Set.class));
     }
 
     @Test
@@ -447,21 +450,20 @@ public class StreamingServiceTest {
         logService = mock(LogService.class);
 
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
-        streamingService = new StreamingService(logService, null);
+        streamingService = new StreamingService(logService);
 
         selectionModel.setRepeatingLoglinesPercent(1);
         streamingService.streamToFile(selectionModel, streamTracker0);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
+                .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(any(List.class));
+                .getMasterFieldsList(any(List.class));
         verify(logService, times(0))
-            .generateLogLine(any(SelectionModel.class), any(Set.class));
+                .generateLogLine(any(SelectionModel.class), any(Set.class));
     }
 
     @Test
@@ -469,21 +471,20 @@ public class StreamingServiceTest {
         logService = mock(LogService.class);
 
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
-        streamingService = new StreamingService(logService, null);
+        streamingService = new StreamingService(logService);
 
         selectionModel.setRepeatingLoglinesPercent(1);
         streamingService.streamToFile(selectionModel, streamTracker1);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
+                .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(any(List.class));
+                .getMasterFieldsList(any(List.class));
         verify(logService, times(1))
-            .generateLogLine(any(SelectionModel.class), any(Set.class));
+                .generateLogLine(any(SelectionModel.class), any(Set.class));
     }
 
     @Test
@@ -491,21 +492,20 @@ public class StreamingServiceTest {
         logService = mock(LogService.class);
 
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
-        streamingService = new StreamingService(logService, null);
+        streamingService = new StreamingService(logService);
 
         selectionModel.setRepeatingLoglinesPercent(1);
         streamingService.streamToFile(selectionModel, streamTracker2);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
+                .preProcessCustomLogs(any(List.class), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(any(List.class));
+                .getMasterFieldsList(any(List.class));
         verify(logService, times(1))
-            .generateLogLine(any(SelectionModel.class), any(Set.class));
+                .generateLogLine(any(SelectionModel.class), any(Set.class));
     }
 
     @Test
@@ -522,13 +522,14 @@ public class StreamingServiceTest {
 
     @Test
     public void test_isAddressAvailable_shouldNotBeAvailable_28() {
-        selectionModel.getStreamSettings().setStreamAddress("FAKEADDRESS");;
+        selectionModel.getStreamSettings().setStreamAddress("FAKEADDRESS");
+        ;
 
         assertFalse(streamingService.isAddressAvailable(selectionModel), "Address should not be available");
     }
 
     @Test
-    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountNoSave_29() throws InterruptedException{
+    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountNoSave_29() throws InterruptedException {
         selectionModel.getStreamSettings().setSaveLogs(false);
         streamingService.streamToAddress(selectionModel, streamTracker0);
 
@@ -536,7 +537,7 @@ public class StreamingServiceTest {
     }
 
     @Test
-    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountNoSave_30() throws InterruptedException{
+    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountNoSave_30() throws InterruptedException {
         selectionModel.getStreamSettings().setSaveLogs(false);
         streamingService.streamToAddress(selectionModel, streamTracker1);
 
@@ -544,7 +545,7 @@ public class StreamingServiceTest {
     }
 
     @Test
-    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountNoSave_31() throws InterruptedException{
+    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountNoSave_31() throws InterruptedException {
         selectionModel.getStreamSettings().setSaveLogs(false);
         streamingService.streamToAddress(selectionModel, streamTracker2);
 
@@ -552,7 +553,7 @@ public class StreamingServiceTest {
     }
 
     @Test
-    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountSave_32() throws InterruptedException{
+    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountSave_32() throws InterruptedException {
         selectionModel.getStreamSettings().setSaveLogs(true);
         streamingService.streamToAddress(selectionModel, streamTracker0);
 
@@ -560,7 +561,7 @@ public class StreamingServiceTest {
     }
 
     @Test
-    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountSave_33() throws InterruptedException{
+    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountSave_33() throws InterruptedException {
         selectionModel.getStreamSettings().setSaveLogs(true);
         streamingService.streamToAddress(selectionModel, streamTracker1);
 
@@ -568,7 +569,7 @@ public class StreamingServiceTest {
     }
 
     @Test
-    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountSave_34() throws InterruptedException{
+    public void test_streamToAddress_streamTrackerShouldHaveCorrectCountSave_34() throws InterruptedException {
         selectionModel.getStreamSettings().setSaveLogs(true);
         streamingService.streamToAddress(selectionModel, streamTracker2);
 
@@ -643,116 +644,110 @@ public class StreamingServiceTest {
     public void test_streamToAddress_correctLogServiceCallsNoRepeating_41() throws InterruptedException {
         logService = mock(LogService.class);
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
-        streamingService = new StreamingService(logService, awsStreamService);
+        streamingService = new StreamingService(logService);
         streamingService.streamToAddress(selectionModel, streamTracker0);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
+                .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(or(any(List.class), eq(null)));
+                .getMasterFieldsList(or(any(List.class), eq(null)));
     }
 
     @Test
     public void test_streamToAddress_correctLogServiceCallsNoRepeating_42() throws InterruptedException {
         logService = mock(LogService.class);
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
-        streamingService = new StreamingService(logService, awsStreamService);
+        streamingService = new StreamingService(logService);
         streamingService.streamToAddress(selectionModel, streamTracker1);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
+                .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(or(any(List.class), eq(null)));
+                .getMasterFieldsList(or(any(List.class), eq(null)));
         verify(logService, times(10))
-            .generateLogLine(any(SelectionModel.class), any(Set.class));
+                .generateLogLine(any(SelectionModel.class), any(Set.class));
     }
 
     @Test
     public void test_streamToAddress_correctLogServiceCallsNoRepeating_43() throws InterruptedException {
         logService = mock(LogService.class);
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
-        streamingService = new StreamingService(logService, awsStreamService);
+        streamingService = new StreamingService(logService);
         streamingService.streamToAddress(selectionModel, streamTracker2);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
+                .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(or(any(List.class), eq(null)));
+                .getMasterFieldsList(or(any(List.class), eq(null)));
         verify(logService, times(20))
-            .generateLogLine(any(SelectionModel.class), any(Set.class));
+                .generateLogLine(any(SelectionModel.class), any(Set.class));
     }
 
     @Test
     public void test_streamToAddress_correctLogServiceCallsRepeating_44() throws InterruptedException {
         logService = mock(LogService.class);
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
         selectionModel.setRepeatingLoglinesPercent(1);
 
-        streamingService = new StreamingService(logService, awsStreamService);
+        streamingService = new StreamingService(logService);
         streamingService.streamToAddress(selectionModel, streamTracker0);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
+                .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(or(any(List.class), eq(null)));
+                .getMasterFieldsList(or(any(List.class), eq(null)));
     }
 
     @Test
     public void test_streamToAddress_correctLogServiceCallsRepeating_45() throws InterruptedException {
         logService = mock(LogService.class);
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
         selectionModel.setRepeatingLoglinesPercent(1);
 
-        streamingService = new StreamingService(logService, awsStreamService);
+        streamingService = new StreamingService(logService);
         streamingService.streamToAddress(selectionModel, streamTracker1);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
+                .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(or(any(List.class), eq(null)));
-            verify(logService, times(5))
-            .generateLogLine(any(SelectionModel.class), any(Set.class));
+                .getMasterFieldsList(or(any(List.class), eq(null)));
+        verify(logService, times(5))
+                .generateLogLine(any(SelectionModel.class), any(Set.class));
     }
 
     @Test
     public void test_streamToAddress_correctLogServiceCallsRepeating_46() throws InterruptedException {
         logService = mock(LogService.class);
         when(logService.generateLogLine(
-            any(SelectionModel.class),
-            any(Set.class))
-        ).thenReturn(new JSONObject());
+                any(SelectionModel.class),
+                any(Set.class))).thenReturn(new JSONObject());
 
         selectionModel.setRepeatingLoglinesPercent(1);
 
-        streamingService = new StreamingService(logService, awsStreamService);
+        streamingService = new StreamingService(logService);
         streamingService.streamToAddress(selectionModel, streamTracker2);
 
         verify(logService, times(1))
-            .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
+                .preProcessCustomLogs(or(any(List.class), eq(null)), any(SelectionModel.class));
         verify(logService, times(1))
-            .getMasterFieldsList(or(any(List.class), eq(null)));
-            verify(logService, times(10))
-            .generateLogLine(any(SelectionModel.class), any(Set.class));
+                .getMasterFieldsList(or(any(List.class), eq(null)));
+        verify(logService, times(10))
+                .generateLogLine(any(SelectionModel.class), any(Set.class));
     }
 
     @Test
@@ -780,30 +775,6 @@ public class StreamingServiceTest {
         streamingService.streamToAddress(selectionModel, streamTracker2);
 
         verifyNoInteractions(awsStreamService);
-    }
-
-    @Test
-    public void test_streamToAddress_correctAwsStreamServiceCallsSave_50() 
-            throws InterruptedException, IOException {
-        streamingService.streamToAddress(selectionModel, streamTracker0);
-
-        verify(awsStreamService, times(1)).saveLogsToAWSS3(streamTracker0);
-    }
-
-    @Test
-    public void test_streamToAddress_correctAwsStreamServiceCallsSave_51() 
-            throws InterruptedException, IOException {
-        streamingService.streamToAddress(selectionModel, streamTracker1);
-
-        verify(awsStreamService, times(1)).saveLogsToAWSS3(streamTracker1);
-    }
-
-    @Test
-    public void test_streamToAddress_correctAwsStreamServiceCallsSave_52() 
-            throws InterruptedException, IOException {
-        streamingService.streamToAddress(selectionModel, streamTracker2);
-
-        verify(awsStreamService, times(1)).saveLogsToAWSS3(streamTracker2);
     }
 
     @Test
