@@ -26,6 +26,7 @@ import {
 } from '@chakra-ui/react';
 import { isNaN } from 'formik';
 import React, { useCallback, useEffect, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
 function CustomLogsModal({
   isOpen,
@@ -38,15 +39,19 @@ function CustomLogsModal({
   const [customLogsText, setCustomLogsText] = useState('');
   const [customLogsTextError, setCustomLogsTextError] = useState(null);
 
-  function replacer(key, value) {
-    if (key === 'id') return undefined;
-    else if (value === '') return undefined;
-    else if (['timeStamp', 'processingTime', 'disposition'].includes(key))
+  function parseKeyValue(key, value, emptyValue) {
+    if (value === '') return emptyValue;
+    else if (!['pathToFile', 'fileSHA256'].includes(key))
       return isNaN(Number(value)) ? value : Number(value);
     else return value;
   }
 
   const updateCustomLogs = useCallback(() => {
+    function replacer(key, value) {
+      if (key === 'id') return undefined;
+      return parseKeyValue(key, value, undefined);
+    }
+
     if (field.value.length === 0) {
       setCustomLogsText('');
     } else {
@@ -93,7 +98,7 @@ function CustomLogsModal({
         };
 
         // set random id to custom log
-        customLogs[index].id = crypto.randomUUID();
+        customLogs[index].id = uuidv4();
       });
 
       // set customLogs field
@@ -156,7 +161,7 @@ function CustomLogsModal({
                               onBlur={event =>
                                 form.setFieldValue(
                                   `customLogs.${index}.fields.${keyName}`,
-                                  event.target.value
+                                  parseKeyValue(keyName, event.target.value, '')
                                 )
                               }
                               placeholder="random"
@@ -191,7 +196,7 @@ function CustomLogsModal({
                   ...field.value,
                   {
                     ...defaultCustomLog,
-                    id: crypto.randomUUID(),
+                    id: uuidv4(),
                   },
                 ])
               }

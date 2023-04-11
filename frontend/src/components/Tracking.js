@@ -76,9 +76,6 @@ function Tracking({ jobID, setJobID, startTime, batchMode, batchSize }) {
     // create new socket using STOMP.js and SockJS
     const stompClient = new Client({
       webSocketFactory: () => new SockJS(process.env.REACT_APP_SOCKET_URL),
-      debug: function (str) {
-        console.log(str);
-      },
     });
 
     // on connect subscribe to the jobID
@@ -227,7 +224,6 @@ function Tracking({ jobID, setJobID, startTime, batchMode, batchSize }) {
         throw Error("Couldn't cancel at this time, please try again later");
       })
       .then(data => {
-        console.log(data);
         setRunning.off();
       })
       .catch(err => {

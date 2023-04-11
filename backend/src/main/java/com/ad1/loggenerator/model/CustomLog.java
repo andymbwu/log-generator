@@ -19,4 +19,28 @@ public class CustomLog {
     // the fields in the custom log
     @NotEmpty
     private Map<String, Object> fields;
+
+    @Override
+    public boolean equals(Object object) {
+
+        if (object == null) {
+            return false;
+        }
+
+        if (!(object instanceof CustomLog)) {
+            return false;
+        }
+
+        CustomLog customLog = (CustomLog)object;
+        
+        if (!frequency.equals(customLog.getFrequency())) {
+            return false;
+        }
+
+        if (!customLog.getFields().keySet().equals(fields.keySet())) {
+            return false;
+        }
+
+        return true;
+    }
 }

@@ -47,13 +47,8 @@ public class BatchService {
             // batch settings
             BatchSettings batchSettings = selectionModel.getBatchSettings();
 
-            // create currentTimeDate as a String to append to filepath
-            LocalDateTime currentDateTime = LocalDateTime.now();
-            DateTimeFormatter formatDateTime = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-            String timestamp = currentDateTime.format(formatDateTime);
-
             // specify filepath location for batch file
-            String filename = "C:\\log-generator\\batch\\" + timestamp + ".json";
+            String filename = "C:\\log-generator\\batch\\" + selectionModel.getJobId() + ".json";
             FileWriter fileWriter = new FileWriter(filename);
 
             // remove fields that should not be included in custom logs
@@ -77,7 +72,9 @@ public class BatchService {
                     batchJobTracker.setLogCount(batchJobTracker.getLogCount() + 1);
 
                     // determine if a log lines repeats
-                    if (Math.random() < selectionModel.getRepeatingLoglinesPercent()) {
+                    // check i + 1 because at this point i is one behind actual logs written
+                    if (Math.random() < selectionModel.getRepeatingLoglinesPercent()
+                        && i + 1 < batchSettings.getNumberOfLogs() && batchJobTracker.getStatus() == JobStatus.ACTIVE) {
                         
                         // add a delimiter
                         fileWriter.write(",\n");

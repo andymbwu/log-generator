@@ -265,7 +265,7 @@ public class LogController {
         StreamJobMetrics streamJobMetrics = statisticsUtilitiesService.generateStreamJobMetrics(jobId);
 
         if (streamJobMetrics == null) {
-            throw new JobNotFoundException("Job Id not found for " + jobId);
+            throw new JobNotFoundException("Job Id not found for job " + jobId);
         }
 
         return streamJobMetrics;
