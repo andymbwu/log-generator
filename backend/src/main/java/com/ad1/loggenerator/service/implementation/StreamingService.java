@@ -128,7 +128,6 @@ public class StreamingService {
                         logs[i] = repeatingLog;
                         repeatingLog = null;
                     }
-
                     // writing logs to temp file
                     if (saveLogs) {
                         if (firstLogSaved) { // add delimiter if not first log line written

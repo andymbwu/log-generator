@@ -95,7 +95,7 @@ public class AWSBatchServiceTest {
         when(batchSettings.getNumberOfLogs()).thenReturn(10);
         when(selectionModel.getBatchSettings()).thenReturn(batchSettings);
         when(selectionModel.getFieldSettings()).thenReturn(fieldSettings);
-        when(logService.getMasterFieldsList(customLogs)).thenReturn(masterFieldList);
+        when(logService.getMasterFieldsList(selectionModel.getCustomLogs())).thenReturn(masterFieldList);
         when(timeStamp.getInclude()).thenReturn(true);
         when(fieldSettings.getTimeStamp()).thenReturn(timeStamp);
         when(disposition.getInclude()).thenReturn(true);
@@ -165,4 +165,6 @@ public class AWSBatchServiceTest {
         // then - verify that the expected interactions occurred
         verify(batchJobTracker, times(1)).setLogCount(eq(10));
     }
+
 }
+
