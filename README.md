@@ -105,7 +105,31 @@ Content-Type: application/json
 
 # Deployment
 
-## Overview
+## Local Docker Deployment
+
+### Overview
+The full stack application is deployed via Docker containers running locally. Below is an overview of this implementation:
+- Docker compose is used to create images of the frontend and backend by running their respective Dockerfiles
+- Ports are assigned and the applications can be accessed via localhost port 8080 (backend) and port 3000 (frontend)
+- Files are saved locally to the backend container and can be accessed via the terminal
+
+### System Requirements
+- Java version 19
+- Docker installed
+
+### Deploy the full stack application locally
+1. Open Docker on your system
+2. In the terminal navigate to root directory of the project cloned on your system
+3. Run the command "docker compose up --build" <br/>
+Note: If an error occurs ensure line endings are set to LF for the file /backend/mvnw and rerun step 2 <br/>
+4. Navigate to the Containers tab within Docker Desktop -> the full stack app is now running
+
+![LocalDeployment](documentation/readme-assets/docker_Containers.png)
+5. Navigate to localhost:3000 to use the application. Refer to the instructions for use above
+
+## AWS Deployment
+
+### Overview
 
 The full stack application is deployed via AWS ECS with self-managed EC2 instances using an automated Jenkins pipeline. Below is an overview of the steps required to do so:
 
@@ -113,7 +137,7 @@ The full stack application is deployed via AWS ECS with self-managed EC2 instanc
 - An Elastic Container Service (ECS) cluster is created and utilized as a container orchestration and management tool
 - The ECS deploys both the frontend and backend images to containers which run on two different EC2 instances
 
-## Configure AWS
+### Configure AWS
 
 Prior to running the Jenkins pipeline, AWS must be configured as outlined below.  
 <b>Note:</b> These configuration steps only need to be completed once.
@@ -216,7 +240,7 @@ Prior to running the Jenkins pipeline, AWS must be configured as outlined below.
       - Name instance frontend
       - Navigate to Elastic IPs - associate an IP with the EC2 instance
 
-## Configure Jenkins
+### Configure Jenkins
 
 Jenkins must be configured to allow you to run the pipeline.  
 <b>Note:</b> Jenkins must be installed on your system and the application launched. Download all standard plugins when prompted during install.
@@ -241,7 +265,12 @@ Jenkins must be configured to allow you to run the pipeline.
       4. `Branches to build`->`Branch Specifier (blank for 'any')`: \*/main
       5. `Script Path`: JenkinsFile
 
-## Deploy the full stack application
+### Deploy the full stack application to AWS
+
+Note: If you've followed the AWS configuration steps for the first time outlined above, due to the allocation of
+new elastic IPs you'll be required to update URLs within the source code in the `prod` branch prior to deploying to AWS. 
+- Frontend -> update .env file
+- Backend -> update java files: WebSocketConfig, LogController, LogsToFileController
 
 To deploy the full stack application for the first time or for future updates follow the steps outlined below:
 
@@ -251,4 +280,4 @@ To deploy the full stack application for the first time or for future updates fo
    ![Jenkins1](documentation/readme-assets/Jenkins_buildNow.png)
 4. The full stack application is now launched and can be accessed by the EC2 instance URLs + port number + API address (applicable to backend)
    1. For example, frontendURL to landing page: http://ec2-52-38-219-170.us-west-2.compute.amazonaws.com/
-   2. For example, backendURL to stats API: http://ec2-100-20-95-225.us-west-2.compute.amazonaws.com:8080/api/v1/generate/stats
+   2. For example, backendURL to stats API: http://ec2-100-20-95-225.us-west-2.compute.amazonaws.com:8080/api/v1/generate/stats <br/>
