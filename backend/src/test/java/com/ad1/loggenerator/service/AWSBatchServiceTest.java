@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -79,7 +80,7 @@ public class AWSBatchServiceTest {
         BusinessGuid businessGuid = mock(BusinessGuid.class);
         PathToFile pathToFile = mock(PathToFile.class);
         CurrentUserId currentUserId = mock(CurrentUserId.class);
-        masterFieldList = mock(Set.class);
+        masterFieldList = mock(HashSet.class);
         CustomLog customLog1 = mock(CustomLog.class);
         List<CustomLog> customLogs = new ArrayList<>();
         customLogs.add(customLog1);
@@ -94,7 +95,7 @@ public class AWSBatchServiceTest {
         when(batchSettings.getNumberOfLogs()).thenReturn(10);
         when(selectionModel.getBatchSettings()).thenReturn(batchSettings);
         when(selectionModel.getFieldSettings()).thenReturn(fieldSettings);
-        when(logService.getMasterFieldsList(customLogs)).thenReturn(masterFieldList);
+        when(logService.getMasterFieldsList(selectionModel.getCustomLogs())).thenReturn(masterFieldList);
         when(timeStamp.getInclude()).thenReturn(true);
         when(fieldSettings.getTimeStamp()).thenReturn(timeStamp);
         when(disposition.getInclude()).thenReturn(true);
@@ -109,6 +110,7 @@ public class AWSBatchServiceTest {
         when(fieldSettings.getPathToFile()).thenReturn(pathToFile);
         when(currentUserId.getInclude()).thenReturn(true);
         when(fieldSettings.getCurrentUserID()).thenReturn(currentUserId);
+        when(batchJobTracker.getStatus()).thenReturn(JobStatus.ACTIVE);
         when(logService.generateLogLine(selectionModel, masterFieldList)).thenReturn(logLine);
         when(s3Client.getObject(anyString(), anyString())).thenReturn(s3Object);
         when(awsLogService.getLogCount(any(AmazonS3.class), any(S3Object.class), anyString(), anyString()))
@@ -124,9 +126,8 @@ public class AWSBatchServiceTest {
     @Test
     public void testGenerateLogLines() {
         // then - verify that the expected interactions occurred
-        // TODO: fix
-        // verify(logService, times(10)).generateLogLine(selectionModel,
-        // masterFieldList);
+         verify(logService, times(10)).generateLogLine(selectionModel,
+         masterFieldList);
     }
 
     @DisplayName("Testing upload logs to AWS S3 bucket in batch mode- verify an object was put in AmazonS3 bucket once")
@@ -164,4 +165,6 @@ public class AWSBatchServiceTest {
         // then - verify that the expected interactions occurred
         verify(batchJobTracker, times(1)).setLogCount(eq(10));
     }
+
 }
+
